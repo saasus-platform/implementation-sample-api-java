@@ -56,6 +56,8 @@ import implementsample.model.UserDeleteRequest;
 import implementsample.model.UserRegisterRequest;
 import implementsample.repository.DeleteUserLogRepository;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 @RestController
 public class SampleController {
@@ -196,7 +198,10 @@ public class SampleController {
             throw e;
         }
 
-        return ResponseEntity.ok(users.getUsers());
+        Gson gson = new GsonBuilder().setPrettyPrinting().create(); // Gsonインスタンスの作成
+        String jsonResponse = gson.toJson(users.getUsers()); // JSON文字列に変換
+
+        return ResponseEntity.ok(jsonResponse);
     }
 
     @GetMapping(value = "/tenant_attributes", produces = "application/json")
