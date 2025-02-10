@@ -38,6 +38,8 @@ import saasus.sdk.auth.models.Credentials;
 import saasus.sdk.auth.models.Roles;
 import saasus.sdk.auth.models.UserInfo;
 import saasus.sdk.auth.models.Users;
+import saasus.sdk.auth.models.Tenant;
+import saasus.sdk.auth.models.TenantProps;
 import saasus.sdk.modules.AuthApiClient;
 import saasus.sdk.modules.PricingApiClient;
 import saasus.sdk.modules.Configuration;
@@ -532,4 +534,152 @@ public class SampleController {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected Exception: " + e.getMessage(), e);
         }
     }
+
+    @GetMapping(value = "/tenant_attributes_list", produces = "application/json")
+    public ResponseEntity<?> getTenantAttributesList(HttpServletRequest request) {
+        System.out.println("API Request: tenant_attributes_list started");
+    
+        try {
+            // AuthApiClient を作成
+            AuthApiClient apiClient = new Configuration().getAuthApiClient();
+            apiClient.setReferer(request.getHeader("Referer"));
+    
+            // テナント属性取得 API 呼び出し
+            System.out.println("Making API call: getTenantAttributes");
+            TenantAttributeApi tenantAttributeApi = new TenantAttributeApi(apiClient);
+            TenantAttributes tenantAttributes = tenantAttributeApi.getTenantAttributes();
+    
+            if (tenantAttributes == null || tenantAttributes.getTenantAttributes().isEmpty()) {
+                System.out.println("No tenant attributes found");
+                return ResponseEntity.ok(Map.of("message", "No tenant attributes found"));
+            }
+    
+            // テナント属性を返却
+            System.out.println("Tenant attributes retrieved successfully");
+            return ResponseEntity.ok(tenantAttributes.toJson());
+    
+        } catch (ApiException e) {
+            System.err.println("API Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "API Exception: " + e.getMessage(), e);
+        } catch (Exception e) {
+            System.err.println("Unexpected Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected Exception: " + e.getMessage(), e);
+        }
+    }
+
+    @PostMapping(value = "/self_sign_up", produces = "application/json")
+    public ResponseEntity<?> selfSignUp(HttpServletRequest request, @Valid @RequestBody Map<String, Object> requestBody) {
+        System.out.println("API Request: self_sign_up started");
+    
+        try {
+            String tenantName = (String) requestBody.get("tenantName");
+            Map<String, Object> tenantAttributeValues = requestBody.get("tenantAttributeValues") != null
+                    ? (Map<String, Object>) requestBody.get("tenantAttributeValues")
+                    : new HashMap<>();
+            Map<String, Object> userAttributeValues = requestBody.get("userAttributeValues") != null
+                    ? (Map<String, Object>) requestBody.get("userAttributeValues")
+                    : new HashMap<>();
+    
+            System.out.println("Making API call: getUserInfo");
+            AuthApiClient apiClient = new Configuration().getAuthApiClient();
+            apiClient.setReferer(request.getHeader("Referer"));
+            UserInfoApi userInfoApi = new UserInfoApi(apiClient);
+            UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
+    
+            if (userInfo.getTenants() != null && !userInfo.getTenants().isEmpty()) {
+                System.err.println("User is already associated with a tenant");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User is already associated with a tenant");
+            }
+    
+            // テナント属性を取得して検証
+            System.out.println("Making API call: getTenantAttributes");
+            TenantAttributeApi tenantAttributeApi = new TenantAttributeApi(apiClient);
+            TenantAttributes tenantAttributes = tenantAttributeApi.getTenantAttributes();
+    
+            System.out.println("Validating tenant attributes");
+            for (Attribute attribute : tenantAttributes.getTenantAttributes()) {
+                String attributeName = attribute.getAttributeName();
+                String attributeType = attribute.getAttributeType().getValue();
+    
+                if (tenantAttributeValues.containsKey(attributeName)) {
+                    Object attributeValue = tenantAttributeValues.get(attributeName);
+    
+                    if ("number".equalsIgnoreCase(attributeType)) {
+                        try {
+                            int numericValue = Integer.parseInt(attributeValue.toString());
+                            tenantAttributeValues.put(attributeName, numericValue);
+                        } catch (NumberFormatException e) {
+                            System.err.println("Invalid value for tenant attribute: " + attributeName);
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                    "Invalid value for tenant attribute: " + attributeName);
+                        }
+                    }
+                }
+            }
+    
+            System.out.println("Making API call: createTenant");
+            TenantApi tenantApi = new TenantApi(apiClient);
+            // TenantProps を作成
+            TenantProps tenantProps = new TenantProps()
+                    .name(tenantName)
+                    .backOfficeStaffEmail(userInfo.getEmail())
+                    .attributes(tenantAttributeValues);
+            
+            // API 呼び出しでテナントを作成
+            Tenant createdTenant = tenantApi.createTenant(tenantProps);
+            String tenantId = createdTenant.getId();
+    
+            // ユーザー属性を取得して検証
+            System.out.println("Making API call: getUserAttributes");
+            UserAttributeApi userAttributeApi = new UserAttributeApi(apiClient);
+            UserAttributes userAttributes = userAttributeApi.getUserAttributes();
+
+            System.out.println("Validating user attributes");
+            for (Attribute attribute : userAttributes.getUserAttributes()) {
+                String attributeName = attribute.getAttributeName();
+                String attributeType = attribute.getAttributeType().getValue();
+
+                if (userAttributeValues.containsKey(attributeName)) {
+                    Object attributeValue = userAttributeValues.get(attributeName);
+
+                    if ("number".equalsIgnoreCase(attributeType)) {
+                        try {
+                            int numericValue = Integer.parseInt(attributeValue.toString());
+                            userAttributeValues.put(attributeName, numericValue);
+                        } catch (NumberFormatException e) {
+                            System.err.println("Invalid value for user attribute: " + attributeName);
+                            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                    "Invalid value for user attribute: " + attributeName);
+                        }
+                    }
+                }
+            }
+
+            System.out.println("Making API call: createTenantUser");
+            TenantUserApi tenantUserApi = new TenantUserApi(apiClient);
+            CreateTenantUserParam createTenantUserParam = new CreateTenantUserParam()
+                    .email(userInfo.getEmail())
+                    .attributes(userAttributeValues);
+            User tenantUser = tenantUserApi.createTenantUser(tenantId, createTenantUserParam);
+
+            System.out.println("Making API call: getRoles");
+            RoleApi roleApi = new RoleApi(apiClient);
+            CreateTenantUserRolesParam createTenantUserRolesParam = new CreateTenantUserRolesParam();
+            createTenantUserRolesParam.setRoleNames(Arrays.asList("admin"));
+            tenantUserApi.createTenantUserRoles(tenantId, tenantUser.getId(), 3, createTenantUserRolesParam);
+
+            System.out.println("User successfully registered to the tenant");
+            Map<String, String> successResponse = new HashMap<>();
+            successResponse.put("message", "User successfully registered to the tenant");
+            return ResponseEntity.ok(successResponse);
+    
+        } catch (ApiException e) {
+            System.err.println("API Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "API Exception: " + e.getMessage(), e);
+        } catch (Exception e) {
+            System.err.println("Unexpected Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected Exception: " + e.getMessage(), e);
+        }
+    }
+
 }
