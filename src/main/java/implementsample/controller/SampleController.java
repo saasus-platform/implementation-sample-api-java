@@ -54,6 +54,7 @@ import saasus.sdk.auth.models.UserAttributes;
 import saasus.sdk.pricing.models.PricingPlan;
 
 import implementsample.entity.DeleteUserLog;
+import implementsample.model.SelfSignUpRequest;
 import implementsample.model.UserDeleteRequest;
 import implementsample.model.UserRegisterRequest;
 import implementsample.repository.DeleteUserLogRepository;
@@ -551,7 +552,9 @@ public class SampleController {
     
             if (tenantAttributes == null || tenantAttributes.getTenantAttributes().isEmpty()) {
                 System.out.println("No tenant attributes found");
-                return ResponseEntity.ok(Map.of("message", "No tenant attributes found"));
+                Map<String, String> response = new HashMap<>();
+                response.put("message", "No tenant attributes found");
+                return ResponseEntity.ok(response);
             }
     
             // テナント属性を返却
@@ -568,16 +571,16 @@ public class SampleController {
     }
 
     @PostMapping(value = "/self_sign_up", produces = "application/json")
-    public ResponseEntity<?> selfSignUp(HttpServletRequest request, @Valid @RequestBody Map<String, Object> requestBody) {
+    public ResponseEntity<?> selfSignUp(HttpServletRequest request, @Valid @RequestBody SelfSignUpRequest requestBody) {
         System.out.println("API Request: self_sign_up started");
-    
+
         try {
-            String tenantName = (String) requestBody.get("tenantName");
-            Map<String, Object> tenantAttributeValues = requestBody.get("tenantAttributeValues") != null
-                    ? (Map<String, Object>) requestBody.get("tenantAttributeValues")
+            String tenantName = requestBody.getTenantName();
+            Map<String, Object> tenantAttributeValues = requestBody.getTenantAttributeValues() != null
+                    ? requestBody.getTenantAttributeValues()
                     : new HashMap<>();
-            Map<String, Object> userAttributeValues = requestBody.get("userAttributeValues") != null
-                    ? (Map<String, Object>) requestBody.get("userAttributeValues")
+            Map<String, Object> userAttributeValues = requestBody.getUserAttributeValues() != null
+                    ? requestBody.getUserAttributeValues()
                     : new HashMap<>();
     
             System.out.println("Making API call: getUserInfo");
@@ -663,7 +666,6 @@ public class SampleController {
             User tenantUser = tenantUserApi.createTenantUser(tenantId, createTenantUserParam);
 
             System.out.println("Making API call: getRoles");
-            RoleApi roleApi = new RoleApi(apiClient);
             CreateTenantUserRolesParam createTenantUserRolesParam = new CreateTenantUserRolesParam();
             createTenantUserRolesParam.setRoleNames(Arrays.asList("admin"));
             tenantUserApi.createTenantUserRoles(tenantId, tenantUser.getId(), 3, createTenantUserRolesParam);
