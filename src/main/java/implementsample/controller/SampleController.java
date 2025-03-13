@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import javax.validation.Valid;
 
@@ -682,4 +683,11 @@ public class SampleController {
         }
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletResponse response) {
+        // クライアントのクッキーを削除
+        response.setHeader("Set-Cookie", "SaaSusRefreshToken=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict");
+
+        return ResponseEntity.ok("{\"message\": \"Logged out successfully\"}");
+    }
 }
