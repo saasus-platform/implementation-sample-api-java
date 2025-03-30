@@ -737,6 +737,7 @@ public class SampleController {
         InvitationApi invitationApi = new InvitationApi(apiClient);
         Invitations invitations = null;
         try {
+            // テナントの全招待を取得
             invitations = invitationApi.getTenantInvitations(tenantId);
             System.out.println(invitations);
         } catch (ApiException e) {
