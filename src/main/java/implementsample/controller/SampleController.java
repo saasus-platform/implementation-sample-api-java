@@ -34,8 +34,10 @@ import saasus.sdk.auth.api.TenantUserApi;
 import saasus.sdk.auth.api.TenantAttributeApi;
 import saasus.sdk.auth.api.UserInfoApi;
 import saasus.sdk.auth.api.UserAttributeApi;
+import saasus.sdk.auth.api.InvitationApi;
 import saasus.sdk.pricing.api.PricingPlansApi;
 import saasus.sdk.auth.models.Credentials;
+import saasus.sdk.auth.models.Invitations;
 import saasus.sdk.auth.models.Roles;
 import saasus.sdk.auth.models.UserInfo;
 import saasus.sdk.auth.models.Users;
@@ -52,12 +54,15 @@ import saasus.sdk.auth.models.CreateSaasUserParam;
 import saasus.sdk.auth.models.CreateTenantUserParam;
 import saasus.sdk.auth.models.CreateTenantUserRolesParam;
 import saasus.sdk.auth.models.UserAttributes;
+import saasus.sdk.auth.models.CreateTenantInvitationParam;
+import saasus.sdk.auth.models.InvitedUserEnvironmentInformationInner;
 import saasus.sdk.pricing.models.PricingPlan;
 
 import implementsample.entity.DeleteUserLog;
 import implementsample.model.SelfSignUpRequest;
 import implementsample.model.UserDeleteRequest;
 import implementsample.model.UserRegisterRequest;
+import implementsample.model.UserInvitationRequest;
 import implementsample.repository.DeleteUserLogRepository;
 
 import com.google.gson.Gson;
@@ -691,5 +696,121 @@ public class SampleController {
         response.setHeader("Set-Cookie", "SaaSusRefreshToken=; Max-Age=0; Path=/; HttpOnly; SameSite=Strict");
 
         return ResponseEntity.ok("{\"message\": \"Logged out successfully\"}");
+    }
+
+    @GetMapping(value = "/invitations", produces = "application/json")
+    public ResponseEntity<?> getInvitations(HttpSession session, HttpServletRequest request, @RequestParam(value = "tenant_id", required = false) String tenantId) throws Exception {
+        AuthApiClient apiClient = new Configuration().getAuthApiClient();
+        apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+
+        UserInfoApi userInfoApi = new UserInfoApi(apiClient);
+        UserInfo userInfo = null;
+        try {
+            userInfo = userInfoApi.getUserInfo(getIDToken(request));
+            System.out.println(userInfo);
+        } catch (ApiException e) {
+            System.err.println("Exception when calling UserInfoApi#getUserInfo");
+            System.err.println("Status code: " + e.getCode());
+            System.err.println("Reason: " + e.getResponseBody());
+            System.err.println("Response headers: " + e.getResponseHeaders());
+            e.printStackTrace();
+            throw e;
+        }
+
+        if (userInfo.getTenants() == null || userInfo.getTenants().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No tenants found for the user");
+        }
+        System.out.println(userInfo.getTenants());
+        
+        if (tenantId == null || tenantId.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "tenant_id query parameter is missing");
+        }
+
+        boolean isBelongingTenant = userInfo.getTenants().stream()
+        .anyMatch(tenant -> tenant.getId().equals(tenantId));
+        if (!isBelongingTenant) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Tenant that does not belong");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
+        }
+
+        InvitationApi invitationApi = new InvitationApi(apiClient);
+        Invitations invitations = null;
+        try {
+            // テナントの全招待を取得
+            invitations = invitationApi.getTenantInvitations(tenantId);
+            System.out.println(invitations);
+        } catch (ApiException e) {
+            System.err.println("Exception when calling InvitationApi#getTenantInvitations");
+            System.err.println("Status code: " + e.getCode());
+            System.err.println("Reason: " + e.getResponseBody());
+            System.err.println("Response headers: " + e.getResponseHeaders());
+            e.printStackTrace();
+            throw e;
+        }
+
+        Gson gson = new GsonBuilder().setPrettyPrinting().create(); // Gsonインスタンスの作成
+        String jsonResponse = gson.toJson(invitations.getInvitations()); // JSON文字列に変換
+
+        return ResponseEntity.ok(jsonResponse);
+    }
+
+    @PostMapping(value = "/user_invitation", produces = "application/json")
+    public ResponseEntity<?> userInvitation(HttpServletRequest request, @Valid @RequestBody UserInvitationRequest requestBody) {
+        System.out.println("API Request: user_invitation started");
+        try {
+            String email = requestBody.getEmail();
+            String tenantId = requestBody.getTenantId();
+
+            AuthApiClient apiClient = new Configuration().getAuthApiClient();
+            apiClient.setReferer(request.getHeader("Referer"));
+
+            System.out.println("Making API call: getUserInfo");
+            UserInfoApi userInfoApi = new UserInfoApi(apiClient);
+            UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
+
+            if (userInfo.getTenants() == null || userInfo.getTenants().isEmpty()) {
+                System.err.println("No tenants found for the user");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No tenants found for the user");
+            }
+
+            boolean isBelongingTenant = userInfo.getTenants().stream()
+                    .anyMatch(tenant -> tenant.getId().equals(tenantId));
+            if (!isBelongingTenant) {
+                System.err.println("Tenant that does not belong: " + tenantId);
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Tenant that does not belong");
+            }
+
+            // リクエストヘッダーからアクセストークンを取得する
+            String accessToken = request.getHeader("X-Access-Token");
+
+            // アクセストークンがリクエストヘッダーに含まれていなかったらエラー
+            if (accessToken == null || accessToken.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Access token is missing");
+            }
+
+            // テナント招待のパラメータを作成
+            InvitedUserEnvironmentInformationInner invitedUserEnvironmentInformationInner = new InvitedUserEnvironmentInformationInner()
+                .id(3) // 本番環境のid:3を指定
+                .addRoleNamesItem("admin");
+            CreateTenantInvitationParam createTenantInvitationParam = new CreateTenantInvitationParam()
+                .email(email)
+                .accessToken(accessToken)
+                .addEnvsItem(invitedUserEnvironmentInformationInner);
+
+            // テナントへの招待を作成
+            InvitationApi invitationApi = new InvitationApi(apiClient);
+            invitationApi.createTenantInvitation(tenantId, createTenantInvitationParam);
+
+            Map<String, String> successResponse = new HashMap<>();
+            successResponse.put("message", "Create tenant user invitation successfully");
+            return ResponseEntity.ok(successResponse);
+        } catch (ApiException e) {
+            System.err.println("API Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "API Exception: " + e.getMessage(), e);
+        } catch (Exception e) {
+            System.err.println("Unexpected Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected Exception: " + e.getMessage(), e);
+        }
     }
 }
