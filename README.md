@@ -2,7 +2,7 @@
 
 This is a SaaS implementation sample using the SaaSus SDK
 
-See the documentation [API implementation using SaaS Platform](https://docs.saasus.io/docs/implementing-authentication-using-saasus-platform-apiserver)
+See the documentation [API implementation using SaaS Platform](https://docs.saasus.io/ja/docs/implementation-guide/implementing-authentication-using-saasus-platform-apiserver)
 
 ## Requirements
 - docker
