@@ -39,10 +39,12 @@ import saasus.sdk.pricing.api.PricingPlansApi;
 import saasus.sdk.auth.models.Credentials;
 import saasus.sdk.auth.models.Invitations;
 import saasus.sdk.auth.models.Roles;
+import saasus.sdk.auth.models.SoftwareTokenSecretCode;
 import saasus.sdk.auth.models.UserInfo;
 import saasus.sdk.auth.models.Users;
 import saasus.sdk.auth.models.Tenant;
 import saasus.sdk.auth.models.TenantProps;
+import saasus.sdk.auth.models.UpdateSoftwareTokenParam;
 import saasus.sdk.modules.AuthApiClient;
 import saasus.sdk.modules.PricingApiClient;
 import saasus.sdk.modules.Configuration;
@@ -51,11 +53,13 @@ import saasus.sdk.auth.models.TenantDetail;
 import saasus.sdk.auth.models.User;
 import saasus.sdk.auth.models.Attribute;
 import saasus.sdk.auth.models.CreateSaasUserParam;
+import saasus.sdk.auth.models.CreateSecretCodeParam;
 import saasus.sdk.auth.models.CreateTenantUserParam;
 import saasus.sdk.auth.models.CreateTenantUserRolesParam;
 import saasus.sdk.auth.models.UserAttributes;
 import saasus.sdk.auth.models.CreateTenantInvitationParam;
 import saasus.sdk.auth.models.InvitedUserEnvironmentInformationInner;
+import saasus.sdk.auth.models.MfaPreference;
 import saasus.sdk.pricing.models.PricingPlan;
 
 import implementsample.entity.DeleteUserLog;
@@ -811,6 +815,185 @@ public class SampleController {
         } catch (Exception e) {
             System.err.println("Unexpected Exception: " + e.getMessage());
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected Exception: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * MFAの状態を取得 (有効/無効の確認)
+     */
+    @GetMapping(value = "/mfa_status", produces = "application/json")
+    public ResponseEntity<?> getMfaStatus(HttpServletRequest request) {
+        try {
+            // SaaSus APIクライアントを初期化
+            AuthApiClient apiClient = new Configuration().getAuthApiClient();
+            apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+
+            // ユーザー情報を取得
+            UserInfoApi userInfoApi = new UserInfoApi(apiClient);
+            UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
+
+            // MFAの有効状態を取得
+            SaasUserApi saasUserApi = new SaasUserApi(apiClient);
+            Boolean enabled = saasUserApi.getUserMfaPreference(userInfo.getId()).getEnabled();
+
+            Map<String, Boolean> result = new HashMap<>();
+            result.put("enabled", enabled);
+            return ResponseEntity.ok(result);
+        } catch (ApiException e) {
+            System.err.println("API Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        } catch (Exception e) {
+            System.err.println("Unexpected Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * MFAセットアップ情報の取得（QRコード発行）
+     */
+    @GetMapping(value = "/mfa_setup", produces = "application/json")
+    public ResponseEntity<?> getMfaSetup(HttpServletRequest request) {
+        try {
+            // リクエストヘッダーからアクセストークンを取得
+            String accessToken = request.getHeader("X-Access-Token");
+            if (accessToken == null || accessToken.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Access token is missing");
+            }
+
+            // SaaSus APIクライアントとユーザー情報を取得
+            AuthApiClient apiClient = new Configuration().getAuthApiClient();
+            apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            UserInfoApi userInfoApi = new UserInfoApi(apiClient);
+            UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
+
+            // シークレットコードを生成
+            SaasUserApi saasUserApi = new SaasUserApi(apiClient);
+            SoftwareTokenSecretCode code = saasUserApi.createSecretCode(
+                userInfo.getId(),
+                new CreateSecretCodeParam().accessToken(accessToken)
+            );
+
+            // Google Authenticator用のQRコードURLを作成
+            String qrCodeUrl = "otpauth://totp/SaaSusPlatform:" + userInfo.getEmail() +
+                    "?secret=" + code.getSecretCode() + "&issuer=SaaSusPlatform";
+                    
+            Map<String, String> result = new HashMap<>();
+            result.put("qrCodeUrl", qrCodeUrl);
+            return ResponseEntity.ok(result);
+        } catch (ApiException e) {
+            System.err.println("API Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        } catch (Exception e) {
+            System.err.println("Unexpected Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * ユーザーのMFA認証コードを検証
+     */
+    @PostMapping(value = "/mfa_verify", produces = "application/json")
+    public ResponseEntity<?> verifyMfa(@RequestBody Map<String, String> requestBody, HttpServletRequest request) {
+        try {
+            // アクセストークンと認証コードを取得
+            String accessToken = request.getHeader("X-Access-Token");
+            if (accessToken == null || accessToken.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Access token is missing");
+            }
+
+            String verificationCode = requestBody.get("verification_code");
+            if (verificationCode == null || verificationCode.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Verification code is required");
+            }
+
+            // ユーザー情報を取得
+            AuthApiClient apiClient = new Configuration().getAuthApiClient();
+            apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            UserInfoApi userInfoApi = new UserInfoApi(apiClient);
+            UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
+
+            // 検証処理の実行
+            SaasUserApi saasUserApi = new SaasUserApi(apiClient);
+            saasUserApi.updateSoftwareToken(
+                userInfo.getId(),
+                new UpdateSoftwareTokenParam()
+                    .accessToken(accessToken)
+                    .verificationCode(verificationCode)
+            );
+
+            Map<String, String> successResponse = new HashMap<>();
+            successResponse.put("message", "MFA verification successful");
+            return ResponseEntity.ok(successResponse);
+        } catch (ApiException e) {
+            System.err.println("API Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        } catch (Exception e) {
+            System.err.println("Unexpected Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * MFAを有効化する
+     */
+    @PostMapping(value = "/mfa_enable", produces = "application/json")
+    public ResponseEntity<?> enableMfa(HttpServletRequest request) {
+        try {
+            // ユーザー情報取得
+            AuthApiClient apiClient = new Configuration().getAuthApiClient();
+            apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            UserInfoApi userInfoApi = new UserInfoApi(apiClient);
+            UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
+
+            // MFA有効化設定をリクエスト
+            MfaPreference mfaPreference = new MfaPreference()
+                .enabled(true)
+                .method(MfaPreference.MethodEnum.SOFTWARETOKEN);
+
+            SaasUserApi saasUserApi = new SaasUserApi(apiClient);
+            saasUserApi.updateUserMfaPreference(userInfo.getId(), mfaPreference);
+
+            Map<String, String> successResponse = new HashMap<>();
+            successResponse.put("message", "MFA has been enabled");
+            return ResponseEntity.ok(successResponse);
+        } catch (ApiException e) {
+            System.err.println("API Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        } catch (Exception e) {
+            System.err.println("Unexpected Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * MFAを無効化する
+     */
+    @PostMapping(value = "/mfa_disable", produces = "application/json")
+    public ResponseEntity<?> disableMfa(HttpServletRequest request) {
+        try {
+            // ユーザー情報取得
+            AuthApiClient apiClient = new Configuration().getAuthApiClient();
+            apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            UserInfoApi userInfoApi = new UserInfoApi(apiClient);
+            UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
+
+            // MFA無効化設定をリクエスト
+            MfaPreference mfaPreference = new MfaPreference()
+                .enabled(false)
+                .method(MfaPreference.MethodEnum.SOFTWARETOKEN);
+
+            SaasUserApi saasUserApi = new SaasUserApi(apiClient);
+            saasUserApi.updateUserMfaPreference(userInfo.getId(), mfaPreference);
+
+            Map<String, String> successResponse = new HashMap<>();
+            successResponse.put("message", "MFA has been disabled");
+            return ResponseEntity.ok(successResponse);
+        } catch (ApiException e) {
+            System.err.println("API Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        } catch (Exception e) {
+            System.err.println("Unexpected Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
         }
     }
 }
