@@ -44,6 +44,8 @@ import implementsample.model.UpdateMeteringCountRequest;
 @RestController
 public class BillingController {
 
+  private static final List<String> ALLOWED_METHODS = Arrays.asList("add", "sub", "direct");
+
   private String getIDToken(HttpServletRequest request) {
     String authHeader = request.getHeader("Authorization");
     if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -67,6 +69,21 @@ public class BillingController {
       }
     }
     return false;
+  }
+
+  private ResponseEntity<?> handleException(Exception e, String operation) {
+    Map<String, String> err = new HashMap<>();
+    
+    if (e instanceof ApiException) {
+      err.put("error", "Auth API error: " + e.getMessage());
+    } else if (e instanceof saasus.sdk.pricing.ApiException) {
+      err.put("error", "Pricing API error: " + e.getMessage());
+    } else {
+      e.printStackTrace();
+      err.put("error", operation + " failed: " + e.getMessage());
+    }
+    
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
   }
 
   private BillingCalculationResult calcMeteringUnitBillings(
@@ -341,21 +358,8 @@ public class BillingController {
 
       return ResponseEntity.ok(response);
 
-    } catch (ApiException e) {
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "Auth API error: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
-
-    } catch (saasus.sdk.pricing.ApiException e) {
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "Pricing API error: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
-
     } catch (Exception e) {
-      e.printStackTrace();
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "Dashboard fetch failed: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+      return handleException(e, "Dashboard fetch");
     }
   }
 
@@ -452,30 +456,12 @@ public class BillingController {
       }
 
       // 7. start DESC でソート
-      results.sort(new Comparator<Map<String, Object>>() {
-        @Override
-        public int compare(Map<String, Object> o1, Map<String, Object> o2) {
-          Long s1 = ((Number) o1.get("start")).longValue();
-          Long s2 = ((Number) o2.get("start")).longValue();
-          return s2.compareTo(s1); // 降順
-        }
-      });
+      results.sort((o1, o2) -> Long.compare(((Number) o2.get("start")).longValue(), ((Number) o1.get("start")).longValue()));
 
       return ResponseEntity.ok(results);
 
-    } catch (ApiException e) {
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "Auth API error: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
-    } catch (saasus.sdk.pricing.ApiException e) { // pricing 側
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "Pricing API error: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
     } catch (Exception e) {
-      e.printStackTrace();
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "plan periods failed: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+      return handleException(e, "plan periods");
     }
   }
 
@@ -546,8 +532,7 @@ public class BillingController {
       String method = body.getMethod();
       int count = body.getCount();
 
-      List<String> allowedMethods = Arrays.asList("add", "sub", "direct");
-      if (!allowedMethods.contains(method)) {
+      if (!ALLOWED_METHODS.contains(method)) {
         Map<String, String> error = new HashMap<>();
         error.put("error", "Invalid method: must be one of add, sub, direct");
         return ResponseEntity.badRequest().body(error);
@@ -567,26 +552,20 @@ public class BillingController {
           .method(UpdateMeteringUnitTimestampCountMethod.fromValue(method))
           .count(count);
 
+      // Convert ts (assumed to be milliseconds since epoch) to seconds, and validate range
+      long tsSeconds = ts / 1000L;
+      if (tsSeconds > Integer.MAX_VALUE || tsSeconds < Integer.MIN_VALUE) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "Timestamp value out of range: " + tsSeconds);
+        return ResponseEntity.badRequest().body(error);
+      }
       MeteringUnitTimestampCount meteringCount = meteringApi.updateMeteringUnitTimestampCount(tenantId, unitName,
-          (int) ts, param);
+          (int) tsSeconds, param);
 
       return ResponseEntity.ok(meteringCount);
 
-    } catch (ApiException e) { // auth 側
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "Auth API error: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
-
-    } catch (saasus.sdk.pricing.ApiException e) { // pricing 側
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "Pricing API error: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
-
-    } catch (Exception e) { // その他
-      e.printStackTrace();
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "Failed to update metering count: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+    } catch (Exception e) {
+      return handleException(e, "Failed to update metering count");
     }
   }
 
@@ -613,8 +592,7 @@ public class BillingController {
       String method = body.getMethod();
       int count = body.getCount();
 
-      List<String> allowedMethods = Arrays.asList("add", "sub", "direct");
-      if (!allowedMethods.contains(method)) {
+      if (!ALLOWED_METHODS.contains(method)) {
         Map<String, String> error = new HashMap<>();
         error.put("error", "Invalid method: must be one of add, sub, direct");
         return ResponseEntity.badRequest().body(error);
@@ -639,21 +617,8 @@ public class BillingController {
 
       return ResponseEntity.ok(meteringCount);
 
-    } catch (ApiException e) { // auth 側
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "Auth API error: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
-
-    } catch (saasus.sdk.pricing.ApiException e) { // pricing 側
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "Pricing API error: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
-
-    } catch (Exception e) { // その他
-      e.printStackTrace();
-      Map<String, String> err = new HashMap<>();
-      err.put("error", "Failed to update metering count: " + e.getMessage());
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+    } catch (Exception e) {
+      return handleException(e, "Failed to update metering count");
     }
   }
 }
