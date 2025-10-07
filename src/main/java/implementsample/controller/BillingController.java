@@ -784,7 +784,13 @@ public class BillingController {
 
       // using_next_plan_fromが指定されている場合のみ設定
       if (requestBody.getUsingNextPlanFrom() != null && requestBody.getUsingNextPlanFrom() > 0) {
-        updateParam.setUsingNextPlanFrom(requestBody.getUsingNextPlanFrom().intValue());
+        long usingNextPlanFrom = requestBody.getUsingNextPlanFrom();
+        if (usingNextPlanFrom < Integer.MIN_VALUE || usingNextPlanFrom > Integer.MAX_VALUE) {
+          Map<String, String> error = new HashMap<>();
+          error.put("error", "usingNextPlanFrom value is out of int range");
+          return ResponseEntity.badRequest().body(error);
+        }
+        updateParam.setUsingNextPlanFrom((int) usingNextPlanFrom);
       }
 
       tenantApi.updateTenantPlan(tenantId, updateParam);
