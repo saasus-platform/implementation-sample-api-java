@@ -38,8 +38,14 @@ import saasus.sdk.pricing.models.TaxRate;
 import saasus.sdk.pricing.models.UpdateMeteringUnitTimestampCountParam;
 import saasus.sdk.pricing.models.UpdateMeteringUnitTimestampCountMethod;
 import saasus.sdk.pricing.models.UpdateMeteringUnitTimestampCountNowParam;
+import saasus.sdk.pricing.models.TaxRates;
+import saasus.sdk.auth.models.PlanReservation;
 import implementsample.model.BillingCalculationResult;
 import implementsample.model.UpdateMeteringCountRequest;
+import implementsample.model.UpdateTenantPlanRequest;
+import implementsample.model.TenantPlanResponse;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 @RestController
 public class BillingController {
@@ -72,18 +78,16 @@ public class BillingController {
   }
 
   private ResponseEntity<?> handleException(Exception e, String operation) {
-    Map<String, String> err = new HashMap<>();
+    // ログに詳細なエラー情報を出力
+    System.err.println("Failed to execute operation: " + operation);
+    System.err.println("Exception: " + e.getMessage());
+    e.printStackTrace();
     
-    if (e instanceof ApiException) {
-      err.put("error", "Auth API error: " + e.getMessage());
-    } else if (e instanceof saasus.sdk.pricing.ApiException) {
-      err.put("error", "Pricing API error: " + e.getMessage());
-    } else {
-      e.printStackTrace();
-      err.put("error", operation + " failed: " + e.getMessage());
-    }
+    // クライアントには簡潔なエラーメッセージを返す
+    Map<String, String> error = new HashMap<>();
+    error.put("error", operation + " failed");
     
-    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(err);
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
   }
 
   private BillingCalculationResult calcMeteringUnitBillings(
@@ -359,7 +363,7 @@ public class BillingController {
       return ResponseEntity.ok(response);
 
     } catch (Exception e) {
-      return handleException(e, "Dashboard fetch");
+      return handleException(e, "Failed to get billing dashboard");
     }
   }
 
@@ -461,7 +465,7 @@ public class BillingController {
       return ResponseEntity.ok(results);
 
     } catch (Exception e) {
-      return handleException(e, "plan periods");
+      return handleException(e, "Failed to get plan periods");
     }
   }
 
@@ -477,7 +481,8 @@ public class BillingController {
         }
       }
     } catch (Exception e) {
-      System.err.println("[planHasYearUnit] " + e.getMessage());
+      System.err.println("[planHasYearUnit] Error occurred while checking for year unit in plan: " + e.getMessage());
+      e.printStackTrace();
     }
     return false;
   }
@@ -618,7 +623,184 @@ public class BillingController {
       return ResponseEntity.ok(meteringCount);
 
     } catch (Exception e) {
-      return handleException(e, "Failed to update metering count");
+      return handleException(e, "Failed to update metering count now");
+    }
+  }
+
+  /**
+   * 料金プラン一覧取得
+   */
+  @GetMapping(value = "/pricing_plans", produces = "application/json")
+  public ResponseEntity<?> getPricingPlans(HttpServletRequest request) {
+    try {
+      // 1. 認証チェック
+      AuthApiClient authClient = new Configuration().getAuthApiClient();
+      authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      UserInfoApi userInfoApi = new UserInfoApi(authClient);
+      userInfoApi.getUserInfo(getIDToken(request)); // 認証チェックのみ
+
+      // 2. 料金プラン一覧を取得
+      PricingApiClient pricingClient = new Configuration().getPricingApiClient();
+      pricingClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      PricingPlansApi plansApi = new PricingPlansApi(pricingClient);
+      saasus.sdk.pricing.models.PricingPlans plans = plansApi.getPricingPlans();
+
+      Gson gson = new GsonBuilder().setPrettyPrinting().create(); // Gsonインスタンスの作成
+      String jsonResponse = gson.toJson(plans.getPricingPlans()); // JSON文字列に変換
+
+      return ResponseEntity.ok(jsonResponse);
+    } catch (Exception e) {
+      return handleException(e, "Failed to get pricing plans");
+    }
+  }
+
+  /**
+   * 税率一覧取得
+   */
+  @GetMapping(value = "/tax_rates", produces = "application/json")
+  public ResponseEntity<?> getTaxRates(HttpServletRequest request) {
+    try {
+      // 1. 認証チェック
+      AuthApiClient authClient = new Configuration().getAuthApiClient();
+      authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      UserInfoApi userInfoApi = new UserInfoApi(authClient);
+      userInfoApi.getUserInfo(getIDToken(request)); // 認証チェックのみ
+
+      // 2. 税率一覧を取得
+      PricingApiClient pricingClient = new Configuration().getPricingApiClient();
+      pricingClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      TaxRateApi taxRateApi = new TaxRateApi(pricingClient);
+      TaxRates taxRates = taxRateApi.getTaxRates();
+
+      Gson gson = new GsonBuilder().setPrettyPrinting().create(); // Gsonインスタンスの作成
+      String jsonResponse = gson.toJson(taxRates.getTaxRates()); // JSON文字列に変換
+
+      return ResponseEntity.ok(jsonResponse);
+    } catch (Exception e) {
+      return handleException(e, "Failed to get tax rates");
+    }
+  }
+
+  /**
+   * テナントプラン情報取得
+   */
+  @GetMapping(value = "/tenants/{tenant_id}/plan", produces = "application/json")
+  public ResponseEntity<?> getTenantPlanInfo(HttpServletRequest request, @PathVariable("tenant_id") String tenantId) {
+    try {
+      if (tenantId == null || tenantId.trim().isEmpty()) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "tenant_id is required");
+        return ResponseEntity.badRequest().body(error);
+      }
+
+      // 1. 認証・認可チェック
+      AuthApiClient authClient = new Configuration().getAuthApiClient();
+      authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      UserInfoApi userInfoApi = new UserInfoApi(authClient);
+      UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
+
+      if (!hasBillingAccess(userInfo, tenantId)) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "Insufficient permissions");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+      }
+
+      // 2. テナント詳細情報を取得
+      TenantApi tenantApi = new TenantApi(authClient);
+      TenantDetail tenant = tenantApi.getTenant(tenantId);
+
+      // 3. 現在のプランの税率情報を取得（プラン履歴の最新エントリから）
+      String currentTaxRateId = null;
+      if (tenant.getPlanHistories() != null && !tenant.getPlanHistories().isEmpty()) {
+        PlanHistory latestPlanHistory = tenant.getPlanHistories().get(tenant.getPlanHistories().size() - 1);
+        if (latestPlanHistory.getTaxRateId() != null) {
+          currentTaxRateId = latestPlanHistory.getTaxRateId();
+        }
+      }
+
+      // 4. レスポンスを構築
+      TenantPlanResponse response = new TenantPlanResponse();
+      response.setId(tenant.getId());
+      response.setName(tenant.getName());
+      response.setPlanId(tenant.getPlanId());
+      response.setTaxRateId(currentTaxRateId);
+      response.setPlanReservation(null);
+
+      // 5. 予約情報がある場合は追加
+      if (tenant.getUsingNextPlanFrom() != null) {
+        Map<String, Object> planReservation = new HashMap<>();
+        planReservation.put("next_plan_id", tenant.getNextPlanId());
+        planReservation.put("using_next_plan_from", tenant.getUsingNextPlanFrom());
+        planReservation.put("next_plan_tax_rate_id", tenant.getNextPlanTaxRateId());
+        response.setPlanReservation(planReservation);
+      }
+
+      return ResponseEntity.ok(response);
+    } catch (Exception e) {
+      return handleException(e, "Failed to retrieve tenant plan info");
+    }
+  }
+
+  /**
+   * テナントプラン更新
+   */
+  @PutMapping(value = "/tenants/{tenant_id}/plan", produces = "application/json")
+  public ResponseEntity<?> updateTenantPlan(HttpServletRequest request, 
+      @PathVariable("tenant_id") String tenantId,
+      @Valid @RequestBody UpdateTenantPlanRequest requestBody) {
+    try {
+
+      if (tenantId == null || tenantId.trim().isEmpty()) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "tenant_id is required");
+        return ResponseEntity.badRequest().body(error);
+      }
+
+      // 1. 認証・認可チェック
+      AuthApiClient authClient = new Configuration().getAuthApiClient();
+      authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      UserInfoApi userInfoApi = new UserInfoApi(authClient);
+      UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
+
+      if (!hasBillingAccess(userInfo, tenantId)) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "Insufficient permissions");
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+      }
+
+      // 2. テナントプランを更新
+      TenantApi tenantApi = new TenantApi(authClient);
+      PlanReservation updateParam = new PlanReservation();
+
+      // next_plan_idが指定されている場合のみ設定
+      if (requestBody.getNextPlanId() != null) {
+        updateParam.setNextPlanId(requestBody.getNextPlanId());
+      }
+
+      // 税率IDが指定されている場合のみ設定
+      if (requestBody.getTaxRateId() != null && !requestBody.getTaxRateId().isEmpty()) {
+        updateParam.setNextPlanTaxRateId(requestBody.getTaxRateId());
+      }
+
+      // using_next_plan_fromが指定されている場合のみ設定
+      if (requestBody.getUsingNextPlanFrom() != null && requestBody.getUsingNextPlanFrom() > 0) {
+        long usingNextPlanFrom = requestBody.getUsingNextPlanFrom();
+        if (usingNextPlanFrom < Integer.MIN_VALUE || usingNextPlanFrom > Integer.MAX_VALUE) {
+          Map<String, String> error = new HashMap<>();
+          error.put("error", "usingNextPlanFrom value is out of int range");
+          return ResponseEntity.badRequest().body(error);
+        }
+        updateParam.setUsingNextPlanFrom((int) usingNextPlanFrom);
+      }
+
+      tenantApi.updateTenantPlan(tenantId, updateParam);
+
+      Map<String, String> successResponse = new HashMap<>();
+      successResponse.put("message", "Tenant plan updated successfully");
+      
+      return ResponseEntity.ok(successResponse);
+    } catch (Exception e) {
+      return handleException(e, "Failed to update tenant plan");
     }
   }
 }
