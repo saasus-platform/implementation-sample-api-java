@@ -270,8 +270,10 @@ public class BillingController {
       // =============================================================
       AuthApiClient authClient = new Configuration().getAuthApiClient();
       authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      authClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
       PricingApiClient pricingClient = new Configuration().getPricingApiClient();
       pricingClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      pricingClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
       // =============================================================
       // 2. 認証ユーザー情報取得＆課金閲覧権限チェック
@@ -380,8 +382,10 @@ public class BillingController {
       // 1. APIクライアント初期化
       AuthApiClient authClient = new Configuration().getAuthApiClient();
       authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      authClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
       PricingApiClient pricingClient = new Configuration().getPricingApiClient();
       pricingClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      pricingClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
       // 2. 認証と権限チェック
       UserInfoApi userInfoApi = new UserInfoApi(authClient);
@@ -523,6 +527,7 @@ public class BillingController {
       // 1. 権限チェック
       AuthApiClient authClient = new Configuration().getAuthApiClient();
       authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      authClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
       UserInfoApi userInfoApi = new UserInfoApi(authClient);
       UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
@@ -551,6 +556,7 @@ public class BillingController {
       // 3. SaaSus API 呼び出し
       PricingApiClient pricingClient = new Configuration().getPricingApiClient();
       pricingClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      pricingClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
       MeteringApi meteringApi = new MeteringApi(pricingClient);
       UpdateMeteringUnitTimestampCountParam param = new UpdateMeteringUnitTimestampCountParam()
@@ -583,6 +589,7 @@ public class BillingController {
       // 1. 権限チェック
       AuthApiClient authClient = new Configuration().getAuthApiClient();
       authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      authClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
       UserInfoApi userInfoApi = new UserInfoApi(authClient);
       UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
@@ -611,6 +618,7 @@ public class BillingController {
       // 3. SaaSus API 呼び出し
       PricingApiClient pricingClient = new Configuration().getPricingApiClient();
       pricingClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      pricingClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
       MeteringApi meteringApi = new MeteringApi(pricingClient);
       UpdateMeteringUnitTimestampCountNowParam param = new UpdateMeteringUnitTimestampCountNowParam()
@@ -636,12 +644,14 @@ public class BillingController {
       // 1. 認証チェック
       AuthApiClient authClient = new Configuration().getAuthApiClient();
       authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      authClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
       UserInfoApi userInfoApi = new UserInfoApi(authClient);
       userInfoApi.getUserInfo(getIDToken(request)); // 認証チェックのみ
 
       // 2. 料金プラン一覧を取得
       PricingApiClient pricingClient = new Configuration().getPricingApiClient();
       pricingClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      pricingClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
       PricingPlansApi plansApi = new PricingPlansApi(pricingClient);
       saasus.sdk.pricing.models.PricingPlans plans = plansApi.getPricingPlans();
 
@@ -663,12 +673,14 @@ public class BillingController {
       // 1. 認証チェック
       AuthApiClient authClient = new Configuration().getAuthApiClient();
       authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      authClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
       UserInfoApi userInfoApi = new UserInfoApi(authClient);
       userInfoApi.getUserInfo(getIDToken(request)); // 認証チェックのみ
 
       // 2. 税率一覧を取得
       PricingApiClient pricingClient = new Configuration().getPricingApiClient();
       pricingClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      pricingClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
       TaxRateApi taxRateApi = new TaxRateApi(pricingClient);
       TaxRates taxRates = taxRateApi.getTaxRates();
 
@@ -696,6 +708,7 @@ public class BillingController {
       // 1. 認証・認可チェック
       AuthApiClient authClient = new Configuration().getAuthApiClient();
       authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      authClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
       UserInfoApi userInfoApi = new UserInfoApi(authClient);
       UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
 
@@ -759,6 +772,7 @@ public class BillingController {
       // 1. 認証・認可チェック
       AuthApiClient authClient = new Configuration().getAuthApiClient();
       authClient.setReferer(request.getHeader("X-Saasus-Referer"));
+      authClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
       UserInfoApi userInfoApi = new UserInfoApi(authClient);
       UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
 
