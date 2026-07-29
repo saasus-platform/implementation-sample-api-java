@@ -848,12 +848,13 @@ public class SampleController {
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
             UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
 
-            // MFAの有効状態を取得
+            // MFAの有効状態と認証方式を取得
             SaasUserApi saasUserApi = new SaasUserApi(apiClient);
-            Boolean enabled = saasUserApi.getUserMfaPreference(userInfo.getId()).getEnabled();
+            MfaPreference mfaPref = saasUserApi.getUserMfaPreference(userInfo.getId());
 
-            Map<String, Boolean> result = new HashMap<>();
-            result.put("enabled", enabled);
+            Map<String, Object> result = new HashMap<>();
+            result.put("enabled", mfaPref.getEnabled());
+            result.put("method", mfaPref.getMethod() != null ? mfaPref.getMethod().getValue() : null);
             return ResponseEntity.ok(result);
         } catch (ApiException e) {
             System.err.println("API Exception: " + e.getMessage());
@@ -952,7 +953,7 @@ public class SampleController {
     }
 
     /**
-     * MFAを有効化する
+     * MFAを有効化する（認証アプリ）
      */
     @PostMapping(value = "/mfa_enable", produces = "application/json")
     public ResponseEntity<?> enableMfa(HttpServletRequest request) {
@@ -964,7 +965,7 @@ public class SampleController {
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
             UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
 
-            // MFA有効化設定をリクエスト
+            // MFA有効化設定をリクエスト（認証アプリ）
             MfaPreference mfaPreference = new MfaPreference()
                 .enabled(true)
                 .method(MfaPreference.MethodEnum.SOFTWARETOKEN);
@@ -974,6 +975,38 @@ public class SampleController {
 
             Map<String, String> successResponse = new HashMap<>();
             successResponse.put("message", "MFA has been enabled");
+            return ResponseEntity.ok(successResponse);
+        } catch (ApiException e) {
+            System.err.println("API Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        } catch (Exception e) {
+            System.err.println("Unexpected Exception: " + e.getMessage());
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage(), e);
+        }
+    }
+
+    /**
+     * MFAをメール認証で有効化する
+     */
+    @PostMapping(value = "/mfa_email_enable", produces = "application/json")
+    public ResponseEntity<?> enableMfaEmail(HttpServletRequest request) {
+        try {
+            // ユーザー情報取得
+            AuthApiClient apiClient = new Configuration().getAuthApiClient();
+            apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            UserInfoApi userInfoApi = new UserInfoApi(apiClient);
+            UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
+
+            // MFA有効化設定をリクエスト（メール認証）
+            MfaPreference mfaPreference = new MfaPreference()
+                .enabled(true)
+                .method(MfaPreference.MethodEnum.EMAIL);
+
+            SaasUserApi saasUserApi = new SaasUserApi(apiClient);
+            saasUserApi.updateUserMfaPreference(userInfo.getId(), mfaPreference);
+
+            Map<String, String> successResponse = new HashMap<>();
+            successResponse.put("message", "Email MFA has been enabled");
             return ResponseEntity.ok(successResponse);
         } catch (ApiException e) {
             System.err.println("API Exception: " + e.getMessage());

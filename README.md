@@ -13,6 +13,8 @@ See the documentation [API implementation using SaaS Platform](https://docs.saas
 # Run in any directory
 git clone git@github.com:saasus-platform/saasus-sdk-java.git
 cd saasus-sdk-java
+# TODO: 暫定対応。mainマージ前にSDK正式リリース版に合わせてこの行を削除すること。
+git checkout feature/v1.13.2-20260409114902
 mvn clean package
 mvn install:install-file -Dfile=target/saasus-sdk-java-1.0.0.jar -DgroupId=io.saasus -DartifactId=saasus-java -Dversion=0.0.1 -Dpackaging=jar
 ```
