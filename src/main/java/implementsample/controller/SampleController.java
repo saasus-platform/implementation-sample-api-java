@@ -99,6 +99,7 @@ public class SampleController {
 
         AuthApiClient apiClient = new Configuration().getAuthApiClient();
         apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+        apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
         CredentialApi apiInstance = new CredentialApi(apiClient);
         Credentials result = null;
         try {
@@ -124,6 +125,7 @@ public class SampleController {
 
         AuthApiClient apiClient = new Configuration().getAuthApiClient();
         apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+        apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
         CredentialApi apiInstance = new CredentialApi(apiClient);
         Credentials result = null;
         try {
@@ -143,6 +145,7 @@ public class SampleController {
     public ResponseEntity<?> getMe(HttpSession session, HttpServletRequest request) throws Exception {
         AuthApiClient apiClient = new Configuration().getAuthApiClient();
         apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+        apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
         UserInfoApi userInfoApi = new UserInfoApi(apiClient);
         UserInfo userInfo = null;
@@ -166,6 +169,7 @@ public class SampleController {
     public ResponseEntity<?> getUsers(HttpSession session, HttpServletRequest request, @RequestParam(value = "tenant_id", required = false) String tenantId) throws Exception {
         AuthApiClient apiClient = new Configuration().getAuthApiClient();
         apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+        apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
         UserInfoApi userInfoApi = new UserInfoApi(apiClient);
         UserInfo userInfo = null;
@@ -222,6 +226,7 @@ public class SampleController {
         String tenantId = request.getParameter("tenant_id");
         AuthApiClient apiClient = new Configuration().getAuthApiClient();
         apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+        apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
         UserInfoApi userInfoApi = new UserInfoApi(apiClient);
         UserInfo userInfo = null;
@@ -285,6 +290,7 @@ public class SampleController {
     public ResponseEntity<?> getUserAttributes(HttpSession session, HttpServletRequest request) throws Exception {
         AuthApiClient apiClient = new Configuration().getAuthApiClient();
         apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+        apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
         UserAttributeApi userAttributeApi = new UserAttributeApi(apiClient);
         UserAttributes userAttributes = null;
@@ -307,6 +313,7 @@ public class SampleController {
     public ResponseEntity<?> getPricingPlan(HttpSession session, HttpServletRequest request, @RequestParam(value = "plan_id", required = false) String planId) throws Exception {
         AuthApiClient apiClient = new Configuration().getAuthApiClient();
         apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+        apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
         UserInfoApi userInfoApi = new UserInfoApi(apiClient);
         UserInfo userInfo = null;
@@ -332,6 +339,7 @@ public class SampleController {
 
         PricingApiClient pricingApiClient = new Configuration().getPricingApiClient();
         pricingApiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+        pricingApiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
         PricingPlansApi pricingPlansApi = new PricingPlansApi(pricingApiClient);
         PricingPlan pricingPlan = null;
         try {
@@ -360,6 +368,7 @@ public class SampleController {
 
             AuthApiClient apiClient = new Configuration().getAuthApiClient();
             apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
             System.out.println("Making API call: getUserInfo");
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
@@ -451,6 +460,7 @@ public class SampleController {
 
             AuthApiClient apiClient = new Configuration().getAuthApiClient();
             apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
             System.out.println("Making API call: getUserInfo");
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
@@ -502,6 +512,7 @@ public class SampleController {
         try {
             AuthApiClient apiClient = new Configuration().getAuthApiClient();
             apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
             UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
@@ -554,6 +565,7 @@ public class SampleController {
             // AuthApiClient を作成
             AuthApiClient apiClient = new Configuration().getAuthApiClient();
             apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
     
             // テナント属性取得 API 呼び出し
             System.out.println("Making API call: getTenantAttributes");
@@ -596,6 +608,7 @@ public class SampleController {
             System.out.println("Making API call: getUserInfo");
             AuthApiClient apiClient = new Configuration().getAuthApiClient();
             apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
             UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
     
@@ -706,6 +719,7 @@ public class SampleController {
     public ResponseEntity<?> getInvitations(HttpSession session, HttpServletRequest request, @RequestParam(value = "tenant_id", required = false) String tenantId) throws Exception {
         AuthApiClient apiClient = new Configuration().getAuthApiClient();
         apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+        apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
         UserInfoApi userInfoApi = new UserInfoApi(apiClient);
         UserInfo userInfo = null;
@@ -768,6 +782,7 @@ public class SampleController {
 
             AuthApiClient apiClient = new Configuration().getAuthApiClient();
             apiClient.setReferer(request.getHeader("Referer"));
+            apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
             System.out.println("Making API call: getUserInfo");
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
@@ -827,6 +842,7 @@ public class SampleController {
             // SaaSus APIクライアントを初期化
             AuthApiClient apiClient = new Configuration().getAuthApiClient();
             apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
 
             // ユーザー情報を取得
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
@@ -863,6 +879,7 @@ public class SampleController {
             // SaaSus APIクライアントとユーザー情報を取得
             AuthApiClient apiClient = new Configuration().getAuthApiClient();
             apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
             UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
 
@@ -909,6 +926,7 @@ public class SampleController {
             // ユーザー情報を取得
             AuthApiClient apiClient = new Configuration().getAuthApiClient();
             apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
             UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
 
@@ -942,6 +960,7 @@ public class SampleController {
             // ユーザー情報取得
             AuthApiClient apiClient = new Configuration().getAuthApiClient();
             apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
             UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
 
@@ -974,6 +993,7 @@ public class SampleController {
             // ユーザー情報取得
             AuthApiClient apiClient = new Configuration().getAuthApiClient();
             apiClient.setReferer(request.getHeader("X-Saasus-Referer"));
+            apiClient.setXSaaSusTraceId(request.getHeader("X-Saasus-Trace-Id"));
             UserInfoApi userInfoApi = new UserInfoApi(apiClient);
             UserInfo userInfo = userInfoApi.getUserInfo(getIDToken(request));
 
